@@ -1,121 +1,74 @@
-describe('check that site has index file', () => {
-  it('should have an index file', () => {
-    cy.readFile('../index.html')
-      .should('exist')
-      .should('contain', '<!DOCTYPE html>');
-  });
-});
+const getNavLinks = () => cy.get('[data-cy="nav-link"][data-nav-target]');
+const getSection = (id) => cy.get(`[data-section-id="${id}"]`);
+const getHeroCta = () => cy.get('[data-cy="hero-cta"][data-scroll-target]');
+const getLeadForm = () => cy.get('[data-cy="lead-form"]');
+const getLeadStatus = () => cy.get('[data-cy="form-status"]');
+const getSubmitButton = () => getLeadForm().find('button[type="submit"]');
+const toggleMobileNav = () => cy.get('[data-cy="mobile-nav-toggle"]');
+const primaryNav = () => cy.get('[data-cy="primary-nav"]');
 
-describe('check that index contains head and body', () => {
-  it('should have a head', () => {
+describe('Landing page visitor journeys', () => {
+  beforeEach(() => {
     cy.visit('index.html');
-    cy.get('head')
-      .should('exist');
   });
 
-  it('should have a body', () => {
-    cy.visit('index.html');
-    cy.get('body')
-      .should('exist');
-  });
-});
+  it('lets visitors jump between sections using the global navigation', () => {
+    getNavLinks()
+      .should('have.length.at.least', 3)
+      .each(($link) => {
+        const target = $link.getAttribute('data-nav-target');
+        expect(target, 'nav link data-nav-target').to.match(/^[\w-]+$/);
 
-describe('check for common html elements', () => {
-  it('should have a <footer> tag', () => {
-    cy.visit('index.html');
-    cy.get('footer')
-      .should('exist');
-  });
-
-  it('should have a <button> tag', () => {
-    cy.visit('index.html');
-    cy.get('button')
-      .should('exist');
-  });
-
-
-  it('should have a <p> tag', () => {
-    cy.visit('index.html');
-    cy.get('p')
-      .should('exist');
-  });
-
-  it('should have at least one <a> tag, all with the href attribute', () => {
-    cy.visit('index.html');
-    cy.get('a')
-      .should('exist')
-      .should('have.attr', 'href');
-  });
-
-  it('should have an <h1> tag', () => {
-    cy.visit('index.html');
-    cy.get('h1')
-      .should('exist');
-  });
-});
-
-describe('check for images', () => {
-  it('should have at least 1 <img> tags, ignore if you used css background-image instead', () => {
-    cy.visit('index.html');
-    cy.get('img')
-      .should('exist')
-      .should('be.visible')
-      .should(($imgs) => $imgs.map((_i, /** @type {HTMLImageElement} */ img) => expect(img.naturalWidth).to.be.greaterThan(0)))
-      .its('length')
-      .should('be.gte', 1);
-  });
-});
-
-describe('check for google fonts', () => {
-  it('at least one <link> tag should point to fonts.googleapis.com (ignore if using other font system)', () => {
-    cy.visit('index.html');
-    cy.get('head link[href*="fonts.googleapis.com"][rel="stylesheet"]')
-      .should('exist');
-  });
-});
-
-describe('check for responsiveness', () => {
-  const sizes = ['iphone-x', 'ipad-2', [1024, 768]];
-
-  sizes.forEach(size => {
-    it(`should have no horizontal overflow on ${size}`, () => {
-      if (Cypress._.isArray(size)) {
-        cy.viewport(size[0], size[1]);
-      } else {
-        cy.viewport(size);
-      }
-
-      cy.visit('index.html');
-      cy.window().then(window => {
-        // make sure scrollwidth is at most viewport width
-        cy.get('body')
-          .invoke('outerWidth')
-          .should('be.most', window.innerWidth);
+        cy.wrap($link).click();
+        cy.location('hash').should('eq', `#${target}`);
+        getSection(target).should('be.visible');
       });
-    });
+  });
 
-    it(`should have proper nav type on ${size} - `, () => {
-      if (Cypress._.isArray(size)) {
-        cy.viewport(size[0], size[1]);
-      } else {
-        cy.viewport(size);
-      }
+  it('scrolls to the lead form when the hero call-to-action is pressed', () => {
+    getHeroCta().then(($cta) => {
+      const target = $cta.attr('data-scroll-target');
+      expect(target, 'hero CTA scroll target').to.match(/^[\w-]+$/);
 
-      cy.visit('index.html');
-      cy.window().then(window => {
-        // make sure scrollwidth is at most viewport width
-        // cy.get('.main-nav__mobile-nav-link-label')
-        cy.get('nav.mobile')
-          .should(window.innerWidth > 640 ? 'not.be.visible' : 'be.visible')
-      });
+      cy.wrap($cta).click();
+      cy.location('hash').should('eq', `#${target}`);
+      cy.window().its('scrollY').should('be.greaterThan', 0);
+      getSection(target)
+        .should('be.visible')
+        .within(() => {
+          cy.get('[data-cy="lead-form"]').should('exist');
+        });
     });
   });
 
-  it('should have at least one @media query and switch a flex box into column direction', () => {
-    cy.readFile('../style.css')
-      .should('exist')
-      .should('contain', 'display: flex;')
-      .should('contain', '@media')
-      .should('contain', 'flex-direction: column;')
+  it('validates lead form submissions before showing a success message', () => {
+    getSubmitButton().click();
+    getLeadStatus().should('have.attr', 'data-status', 'error');
+
+    getLeadForm().within(() => {
+      cy.get('input[name="name"]').type('Visitor Van Fleet');
+      cy.get('input[type="email"]').type('visitor@example.com');
+      cy.get('textarea[name="message"]').type('Excited to learn more!');
+    });
+
+    getSubmitButton().click();
+    getLeadStatus().should('have.attr', 'data-status', 'success');
+  });
+
+  it('provides a mobile navigation toggle that reflects its expanded state', () => {
+    cy.viewport('iphone-x');
+    cy.visit('index.html');
+
+    toggleMobileNav()
+      .should('have.attr', 'aria-expanded', 'false');
+    primaryNav().should('have.attr', 'aria-hidden', 'true');
+
+    toggleMobileNav().click();
+    toggleMobileNav().should('have.attr', 'aria-expanded', 'true');
+    primaryNav().should('have.attr', 'aria-hidden', 'false');
+
+    toggleMobileNav().click();
+    toggleMobileNav().should('have.attr', 'aria-expanded', 'false');
+    primaryNav().should('have.attr', 'aria-hidden', 'true');
   });
 });

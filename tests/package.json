@@ -6,7 +6,7 @@
   "scripts": {
     "test": "cypress run"
   },
-  "dependencies": {
-    "cypress": "^13.7.1"
+  "devDependencies": {
+    "cypress": "^15.5.0"
   }
 }
