@@ -1,9 +1,11 @@
-const { defineConfig } = require('cypress')
+import { defineConfig } from 'cypress';
 
-module.exports = defineConfig({
+export default defineConfig({
   fileServerFolder: '../',
-	e2e: {
+  e2e: {
+    video: false,
+    supportFile: false,
+    screenshotOnRunFailure: false,
     setupNodeEvents(on, config) {},
-		supportFile: false,
   },
-})
+});
